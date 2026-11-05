@@ -40,7 +40,7 @@ Visual Studio 2019 or 2022 with the v142 toolset (C++ desktop workload) and the 
 ```
 git clone --recurse-submodules https://github.com/adeesababa/FNV-SpawnMenu.git
 cd FNV-SpawnMenu
-nuget restore packages.config -PackagesDirectory packages
+msbuild SpawnMenu.vcxproj -t:restore -p:RestorePackagesConfig=true -p:Configuration=Release -p:Platform=Win32
 msbuild SpawnMenu.vcxproj -p:Configuration=Release -p:Platform=Win32
 ```
 
