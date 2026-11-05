@@ -20,6 +20,10 @@ A GMod-style spawn menu as an xNVSE plugin. Press **L** in game:
 
 The menu draws through Direct3D 9 and reads input in a way that works with or without DXVK. So far it has been tested under DXVK.
 
+## Save size
+
+Like anything placed with the console, every NPC and creature you spawn stays in your save for good, dead or alive. A few are fine. Hundreds (easy with the tool gun) make your save bigger and slower to load. To remove one, open the console, click it and type `disable`, then `markfordelete`. Use a separate save for big experiments.
+
 ## Install
 
 Install the release zip with a mod manager, or copy `SpawnMenu.dll` into `Data\NVSE\Plugins`.
