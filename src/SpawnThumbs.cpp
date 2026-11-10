@@ -343,7 +343,7 @@ void ThumbFrame() {
 
 		if (FileExists(AbsPath(pic.cachePath)) && LoadPicture(pic)) continue;
 
-		const bool bakeable = !pic.info.model.empty() && pic.info.category != kCat_NPC && !g_renderOff;
+		const bool bakeable = !pic.info.model.empty() && pic.info.category != kCat_NPC && !g_renderOff && Opt.renderPictures;
 		if (!bakeable) {
 			Fail(pic);
 			continue;

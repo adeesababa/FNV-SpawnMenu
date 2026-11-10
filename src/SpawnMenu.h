@@ -70,6 +70,7 @@ namespace SpawnMenu {
 		bool	listMode = false;	// a GECK-style table (name, editor ID, form ID, type, plugin, model) instead of pictures
 		bool	editorNames = false;// show editor IDs instead of in-game names (falls back to the name where the ID is unknown)
 		bool	autoEquip = false;	// "Equip on add": weapons and armor added to the inventory are also equipped
+		bool	renderPictures = true;	// draw pictures from models the game has loaded; off = the disk cache and icons only
 	};
 	extern Options	Opt;
 	void			OptionsLoad();

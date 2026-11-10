@@ -1,16 +1,19 @@
 #include "SpawnMenu.h"
 
 // 2026-11-04 Spawn menu, the bake: draws one form's model into a kThumbSize x kThumbSize picture (see SpawnMenu.h).
-// Does: loads the model with the game's ModelLoader::LoadFile (0x00447080, synchronous on the calling thread, so a queued
-// load is never waited on and retry is never asked), walks its NiNode tree (hidden nodes and collision skipped), draws every
-// NiGeometry in bind pose with its own vertex and index buffers through a small shader (diffuse texture from the lighting
-// property, else flat grey, times a key, fill and ambient light) from a 3/4 view fitted to the union of the bounds. Each
-// RenderEntry returns a new D3DPOOL_DEFAULT render target; the caller releases it.
+// Does: looks the model up in the game's loaded-model map (ModelLoader +0x00, the map's virtual Get, as ModelLoader::FindModel
+// 0x004472A0 does) and uses it only when the game itself holds it (reference count > 0) and its NiNode is there; walks its NiNode
+// tree (hidden nodes and collision skipped), draws every NiGeometry in bind pose with its own vertex and index buffers through a
+// small shader (diffuse texture from the lighting property, else flat grey, times a key, fill and ambient light) from a 3/4 view
+// fitted to the union of the bounds. Each RenderEntry returns a new D3DPOOL_DEFAULT render target; the caller releases it.
+// Never loads a model from disk (11-10): ModelLoader::LoadFile from inside Present hung or crashed the game on players' setups
+// (SpawnMenu.log stopped on the second load of the first frame), took no reference, so the model could be freed under the
+// draw, and a model fresh from disk has no GPU buffers yet anyway (0 drawn). A model the game has not loaded gets its icon.
 // Does not handle: NPCs (no picture), alpha blending and cutouts (drawn opaque), skin bones (bind pose), LOD and particle
 // geometry (skipped unless the game packed buffers for it), geometry without buffers yet (skipped and counted in the log),
-// and holds on the model: LoadFile takes no reference here (abDontIncrementRefCount), so the game may unload the model
-// later; the picture is taken in the same call as the load, so it never reads a freed model.
-// Game memory is only touched inside the SEH helpers (LoadAndCollectSEH, DrawSEH); no C++ objects live in those functions.
+// models the game has not loaded (icon). Takes no reference: the game's own reference keeps the model alive for this call on
+// the main thread; the picture is taken in the same call as the lookup.
+// Game memory is only touched inside the SEH helpers (FindAndCollectSEH, DrawSEH); no C++ objects live in those functions.
 
 namespace {
 	const char* kVertexSource =
@@ -71,6 +74,8 @@ namespace {
 	D3DVIEWPORT9 gVP;
 	bool gBegun = false;
 	int gEntries = 0;	// bakes so far this session (the first few are logged)
+	int gTried = 0;		// pictures asked for so far this session; the first kTriedLogged are logged before the lookup
+	const int kTriedLogged = 40;
 	bool gLoggedFail = false, gLoggedSEH = false;
 
 	// The game's Gamebryo local transform as a row-vector matrix: point times matrix = the transformed point.
@@ -121,17 +126,29 @@ namespace {
 		}
 	}
 
-	// Loads the model (synchronous, no reference taken) and collects its geometry. 0 = done, -1 = a game-memory exception.
-	int LoadAndCollectSEH(const char* path, NiNode** root) {
+	// Finds the model in the game's loaded-model map and collects its geometry. No load, no reference. 0 = done (root stays
+	// nullptr when the game does not hold the model), -1 = a game-memory exception. The map's key is the path the game loaded it
+	// by, which is tried with and without the "Meshes\\" prefix.
+	int FindAndCollectSEH(const char* path, NiNode** root, int* refs) {
 		__try {
-			typedef NiNode* (__thiscall* LoadFileFn)(void*, const char*, int, bool, bool, bool, bool);
+			typedef bool(__thiscall* GetFn)(void*, const char*, void**);
 			*root = nullptr;
-			if (!SpawnGame::ModelLoader()) return 0;
-			// LoadFile(path, lodFadeMult 0, prepareObject true (as the game's own camera-shake load), suppressWarning false,
-			// faceGen false, dontIncrementRefCount true). The true is deliberate: the draw happens right here, so nothing can free
-			// the model meanwhile; a reference could not be released again without the Model pointer.
-			NiNode* loaded = ((LoadFileFn)0x00447080)(SpawnGame::ModelLoader(), path, 0, true, false, false, true);
-			if (!loaded) return 0;
+			*refs = 0;
+			void* loader = SpawnGame::ModelLoader();
+			if (!loader) return 0;
+			void* map = *(void**)loader;	// LockFreeCaseInsensitiveStringMap<Model*>
+			if (!map) return 0;
+			GetFn get = (GetFn)((*(void***)map)[2]);	// vtable slot 2: bool Get(key, Model** out)
+			void* model = nullptr;
+			if (!get(map, path, &model) || !model) {
+				const char* bare = (_strnicmp(path, "Meshes\\", 7) == 0) ? path + 7 : nullptr;
+				if (!bare || !get(map, bare, &model) || !model) return 0;
+			}
+			// Model: the game's reference counts at +0x04 and +0x08 (summed, as Model::GetRefCount 0x00443190), the NiNode at +0x0C.
+			*refs = *(int*)((char*)model + 0x04) + *(int*)((char*)model + 0x08);
+			if (*refs <= 0) return 0;	// the game may free it at any time: not touched
+			NiNode* loaded = *(NiNode**)((char*)model + 0x0C);
+			if (!loaded) return 0;	// still loading
 			*root = loaded;
 			D3DXMATRIX identity;
 			D3DXMatrixIdentity(&identity);
@@ -327,7 +344,12 @@ void* RenderEntry(const Entry& entry, bool* retry) {
 	gJob.count = 0;
 	gJob.skipped = 0;
 	NiNode* root = nullptr;
-	const int loadResult = LoadAndCollectSEH(path, &root);
+	int refs = 0;
+	if (gTried < kTriedLogged) {	// before touching game memory, so a crash log names the model
+		gTried++;
+		Logger::Log("SpawnRender: picture for %s%s", path, gTried == kTriedLogged ? " (last one logged)" : "");
+	}
+	const int loadResult = FindAndCollectSEH(path, &root, &refs);
 	if (loadResult < 0) {
 		if (!gLoggedSEH) { gLoggedSEH = true; Logger::Log("SpawnRender: the game's model code threw on %s (logged once; that entry gets no picture)", path); }
 		return nullptr;

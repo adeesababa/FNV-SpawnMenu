@@ -37,6 +37,7 @@ void OptionsLoad() {
 	Opt.listMode = GetPrivateProfileIntA("Options", "ListMode", 0, path.c_str()) != 0;
 	Opt.editorNames = GetPrivateProfileIntA("Options", "EditorIDNames", 0, path.c_str()) != 0;
 	Opt.autoEquip = GetPrivateProfileIntA("Options", "EquipOnAdd", 0, path.c_str()) != 0;
+	Opt.renderPictures = GetPrivateProfileIntA("Options", "RenderPictures", 1, path.c_str()) != 0;
 }
 
 void OptionsSave() {
@@ -47,6 +48,7 @@ void OptionsSave() {
 	WritePrivateProfileStringA("Options", "ListMode", Opt.listMode ? "1" : "0", path.c_str());
 	WritePrivateProfileStringA("Options", "EditorIDNames", Opt.editorNames ? "1" : "0", path.c_str());
 	WritePrivateProfileStringA("Options", "EquipOnAdd", Opt.autoEquip ? "1" : "0", path.c_str());
+	WritePrivateProfileStringA("Options", "RenderPictures", Opt.renderPictures ? "1" : "0", path.c_str());
 }
 
 std::string KeyName(int vk) {
@@ -254,6 +256,8 @@ void DrawOptionsMenu() {
 		ImGui::SeparatorText("View");
 		if (ImGui::MenuItem("Pictures", nullptr, !Opt.listMode)) { Opt.listMode = false; OptionsSave(); }
 		if (ImGui::MenuItem("List (GECK style)", nullptr, Opt.listMode)) { Opt.listMode = true; OptionsSave(); gSortDirty = true; }
+		if (ImGui::MenuItem("Draw new pictures", nullptr, Opt.renderPictures)) { Opt.renderPictures = !Opt.renderPictures; OptionsSave(); }
+		ImGui::TextDisabled("Off: saved pictures and icons only.");
 
 		ImGui::SeparatorText("Names");
 		if (ImGui::MenuItem("In-game names", nullptr, !Opt.editorNames)) { Opt.editorNames = false; OptionsSave(); gSortDirty = true; }

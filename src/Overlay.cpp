@@ -16,7 +16,7 @@
 
 namespace {
 
-const UInt32 kPluginVersion = 2;
+const UInt32 kPluginVersion = 3;
 
 // The menu key (Options > Change menu key; L by default) and its DirectInput code, which another overlay that holds the
 // keyboard has disabled. VK -> scan code with MAPVK_VK_TO_VSC_EX gives the E0 prefix of extended keys (Home, arrows...),
@@ -518,8 +518,9 @@ __declspec(dllexport) bool NVSEPlugin_Load(const PluginInterface* nvse) {
 	gLog = _fsopen((ExeFolder() + "\\SpawnMenu.log").c_str(), "w", _SH_DENYWR);
 	Logger::Log("Spawn menu %u: loading", kPluginVersion);
 	SpawnMenu::OptionsLoad();
-	Logger::Log("Spawn menu: menu key %s, %s, %s names, equip on add %d", SpawnMenu::KeyName(ToggleKey()).c_str(),
-		SpawnMenu::Opt.listMode ? "list" : "pictures", SpawnMenu::Opt.editorNames ? "editor ID" : "in-game", SpawnMenu::Opt.autoEquip);
+	Logger::Log("Spawn menu: menu key %s, %s, %s names, equip on add %d, draw new pictures %d (only models the game has loaded)",
+		SpawnMenu::KeyName(ToggleKey()).c_str(), SpawnMenu::Opt.listMode ? "list" : "pictures",
+		SpawnMenu::Opt.editorNames ? "editor ID" : "in-game", SpawnMenu::Opt.autoEquip, SpawnMenu::Opt.renderPictures);
 
 	gConsole = (NVSEConsoleInterface*)nvse->QueryInterface(kInterface_Console);
 	NVSEDataInterface* data = (NVSEDataInterface*)nvse->QueryInterface(kInterface_Data);
