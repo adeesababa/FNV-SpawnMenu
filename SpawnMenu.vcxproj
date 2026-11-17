@@ -33,7 +33,7 @@
       <!-- static runtime: no dependency on the player's MSVCP140 version -->
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalIncludeDirectories>$(ProjectDir)src;$(ProjectDir)lib\imgui;$(ProjectDir)lib\imgui\backends;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)src;$(ProjectDir)lib\imgui;$(ProjectDir)lib\imgui\backends;$(ProjectDir)lib\Detours;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <ForcedIncludeFiles>$(ProjectDir)src\SpawnGame.h</ForcedIncludeFiles>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
@@ -58,6 +58,9 @@
     <ClCompile Include="lib\imgui\imgui_widgets.cpp"><ForcedIncludeFiles></ForcedIncludeFiles></ClCompile>
     <ClCompile Include="lib\imgui\backends\imgui_impl_dx9.cpp"><ForcedIncludeFiles></ForcedIncludeFiles></ClCompile>
     <ClCompile Include="lib\imgui\backends\imgui_impl_win32.cpp"><ForcedIncludeFiles></ForcedIncludeFiles></ClCompile>
+    <ClCompile Include="lib\Detours\detours.cpp"><ForcedIncludeFiles></ForcedIncludeFiles><WarningLevel>TurnOffAllWarnings</WarningLevel></ClCompile>
+    <ClCompile Include="lib\Detours\disasm.cpp"><ForcedIncludeFiles></ForcedIncludeFiles><WarningLevel>TurnOffAllWarnings</WarningLevel></ClCompile>
+    <ClCompile Include="lib\Detours\modules.cpp"><ForcedIncludeFiles></ForcedIncludeFiles><WarningLevel>TurnOffAllWarnings</WarningLevel></ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\SpawnGame.h" />

@@ -6,6 +6,7 @@
 #include <cstdio>
 #include <deque>
 #include <share.h>
+#include "detours.h"
 
 // The plugin itself: the xNVSE entry points, a hook on the device's Present (and Reset) that draws the spawn window over the
 // finished frame, its own ImGui, the L key, and the game's input switched off while the window is open.
@@ -16,7 +17,7 @@
 
 namespace {
 
-const UInt32 kPluginVersion = 3;
+const UInt32 kPluginVersion = 4;
 
 // The menu key (Options > Change menu key; L by default) and its DirectInput code, which another overlay that holds the
 // keyboard has disabled. VK -> scan code with MAPVK_VK_TO_VSC_EX gives the E0 prefix of extended keys (Home, arrows...),
@@ -453,7 +454,11 @@ void PatchSlot(void** slots, int slot, void* hook) {
 	VirtualProtect(&slots[slot], sizeof(void*), protection, &protection);
 }
 
-// Once the game has its device (the first game loops): Present is slot 17, Reset slot 16.
+// Once the game has its device (the first game loops): Present is slot 17, Reset slot 16, the swap chain's Present slot 3.
+// The functions those slots point at are detoured (their code patched), not the slots: Windows' own Direct3D 9 writes its
+// entries back into the device's table, so a slot hook ran for one frame and the L key was never read again (11-14, menu dead
+// without DXVK; Vegas Shaders saw the same on its draw hooks, CapturedNormals::EnsureHooked). DXVK leaves the table alone, and
+// detours work there too. If Detours refuses, the slots are patched as before.
 void HookDeviceOnce() {
 	if (RealPresent) return;
 	IDirect3DDevice9* device = SpawnGame::Device();
@@ -461,17 +466,39 @@ void HookDeviceOnce() {
 	void** slots = *(void***)device;
 	RealPresent = (PresentFn)slots[17];
 	RealReset = (ResetFn)slots[16];
-	PatchSlot(slots, 16, (void*)ResetHook);
-	PatchSlot(slots, 17, (void*)PresentHook);
 	IDirect3DSwapChain9* chain = nullptr;
-	if (SUCCEEDED(device->GetSwapChain(0, &chain)) && chain) {	// IDirect3DSwapChain9::Present is slot 3
-		void** chainSlots = *(void***)chain;
+	void** chainSlots = nullptr;
+	if (SUCCEEDED(device->GetSwapChain(0, &chain)) && chain) {
+		chainSlots = *(void***)chain;
 		RealSwapPresent = (SwapPresentFn)chainSlots[3];
-		PatchSlot(chainSlots, 3, (void*)SwapPresentHook);
 		chain->Release();
 	}
-	Logger::Log("Spawn menu: hooked Present (device %p%s) and Reset; %s opens the menu in game", device, RealSwapPresent ? " and swap chain" : "",
-		SpawnMenu::KeyName(ToggleKey()).c_str());
+	LONG result = DetourTransactionBegin();
+	if (result == NO_ERROR) {
+		DetourUpdateThread(GetCurrentThread());
+		LONG step = DetourAttach(&(PVOID&)RealPresent, (PVOID)PresentHook);
+		if (step == NO_ERROR) step = DetourAttach(&(PVOID&)RealReset, (PVOID)ResetHook);
+		if (step == NO_ERROR && RealSwapPresent && (void*)RealSwapPresent != slots[17])
+			step = DetourAttach(&(PVOID&)RealSwapPresent, (PVOID)SwapPresentHook);
+		if (step == NO_ERROR) result = DetourTransactionCommit();
+		else { DetourTransactionAbort(); result = step; }
+	}
+	if (result == NO_ERROR) {
+		Logger::Log("Spawn menu: detoured Present (device %p%s) and Reset; %s opens the menu in game", device,
+			RealSwapPresent ? " and swap chain" : "", SpawnMenu::KeyName(ToggleKey()).c_str());
+		return;
+	}
+	// Fallback: the table slots (an aborted transaction leaves the Real* pointers as they were)
+	RealPresent = (PresentFn)slots[17];
+	RealReset = (ResetFn)slots[16];
+	PatchSlot(slots, 16, (void*)ResetHook);
+	PatchSlot(slots, 17, (void*)PresentHook);
+	if (chainSlots) {
+		RealSwapPresent = (SwapPresentFn)chainSlots[3];
+		PatchSlot(chainSlots, 3, (void*)SwapPresentHook);
+	}
+	Logger::Log("Spawn menu: Detours failed (%ld): hooked the table slots of Present (device %p%s) and Reset; without DXVK they may not last",
+		result, device, RealSwapPresent ? " and swap chain" : "");
 }
 
 void OnNVSEMessage(NVSEMessagingInterface::Message* message) {
