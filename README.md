@@ -10,7 +10,9 @@ A GMod-style spawn menu as an xNVSE plugin. Press **L** in game:
 - **Weather:** every weather. Click one to force it, or blend into it. The tab also has:
   - Time of day and time scale controls.
   - Live edits to the current weather's fog, wind, sun glare and clouds.
-- **Options:** change the menu key, switch between pictures and a list view, and choose in-game names or editor IDs.
+- **Options:** change the menu key, switch between pictures and a list view, turn new pictures off, and choose in-game names or editor IDs.
+
+Item pictures are drawn only from models the game already has loaded (for example the gun in your hands or items lying nearby); every other item shows its Pip-Boy icon. Pictures are saved and stay after that.
 
 ## Requirements
 
@@ -18,7 +20,7 @@ A GMod-style spawn menu as an xNVSE plugin. Press **L** in game:
 - [xNVSE](https://github.com/xNVSE/NVSE)
 - DirectX 9 June 2010 runtime (`d3dx9_43.dll`); most New Vegas setups already have it
 
-The menu draws through Direct3D 9 and reads input in a way that works with or without DXVK. So far it has been tested under DXVK.
+Works with or without DXVK.
 
 ## Save size
 
@@ -37,6 +39,11 @@ Install the release zip with a mod manager, or copy `SpawnMenu.dll` into `Data\N
 | `Data\SpawnMenu\SpawnMenu.imgui.ini` | window size and position |
 | `SpawnMenu.log` (game folder) | what it did; please attach it to bug reports |
 
+## Changes
+
+- **1.1.0:** the menu opens without DXVK (Windows' own Direct3D 9 undid the frame hook after one frame); no more freeze or crash when the item tabs open (pictures no longer load models from disk); Options > View > "Draw new pictures"; the log names each model before its picture is drawn.
+- **1.0.0:** first release.
+
 ## Building
 
 Visual Studio 2019 or 2022 with the v142 toolset (C++ desktop workload) and the Windows 10/11 SDK.
@@ -48,13 +55,13 @@ msbuild SpawnMenu.vcxproj -t:restore -p:RestorePackagesConfig=true -p:Configurat
 msbuild SpawnMenu.vcxproj -p:Configuration=Release -p:Platform=Win32
 ```
 
-The DLL is written to `build\SpawnMenu.dll`. The D3DX headers and library come from the `Microsoft.DXSDK.D3DX` NuGet package (`packages.config`). ImGui is a git submodule (`lib/imgui`, docking branch).
+The DLL is written to `build\SpawnMenu.dll`. The D3DX headers and library come from the `Microsoft.DXSDK.D3DX` NuGet package (`packages.config`). ImGui is a git submodule (`lib/imgui`, docking branch). Microsoft Detours 4.0.1 (the five files the plugin needs) is in `lib/Detours`.
 
 ## Layout
 
 | Path | What |
 |---|---|
-| `src/Overlay.cpp` | the plugin: xNVSE entry, Present/Reset hooks, ImGui, menu key, input blocking |
+| `src/Overlay.cpp` | the plugin: xNVSE entry, Present/Reset hooks (Detours), ImGui, menu key, input blocking |
 | `src/SpawnCatalog.cpp` | the lists: items, NPCs and creatures, cells, weathers (weather editor IDs read from the plugin files) |
 | `src/SpawnMenuUI.cpp` | the window, tabs, search, grid and list views, options |
 | `src/SpawnPlaces.cpp` | the Locations and Weather tabs |
@@ -68,6 +75,7 @@ The DLL is written to `build\SpawnMenu.dll`. The D3DX headers and library come f
 - **Engine addresses:** WallSoGB's symbol map of the game.
 - **Plugin API:** [xNVSE](https://github.com/xNVSE/NVSE).
 - **UI library:** [Dear ImGui](https://github.com/ocornut/imgui) (MIT).
+- **Function hooks:** [Microsoft Detours](https://github.com/microsoft/Detours) (MIT, [lib/Detours/LICENSE.md](lib/Detours/LICENSE.md)).
 
 ## License
 
